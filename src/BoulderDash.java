@@ -5,6 +5,8 @@ import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Image;
 import java.awt.Rectangle;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.awt.geom.Rectangle2D;
@@ -14,6 +16,7 @@ import java.util.List;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.Timer;
 
 public class BoulderDash extends JPanel {
     //whether we should print the board
@@ -23,6 +26,10 @@ public class BoulderDash extends JPanel {
 	private BDLevelReader blr;
 	private int numLevels;
 	private int level = 1;
+    private int moves = 0;
+    private int time = 0;
+    private Timer timer;
+    private static final int DELAY = 1000;
 
 	//gamefield's rectangles
 	private final int WIDTH = 40;
@@ -33,7 +40,19 @@ public class BoulderDash extends JPanel {
 	private int diamondsCollected = 0;
     private JLabel levelLabel = new JLabel ("Level: " + level);
     private JLabel levelDiamondsCollected = new JLabel ("Diamonds Collected: " + (diamondsCollected));
+    private JLabel levelMovesLabel = new JLabel ("Moves: " + (moves));
+    private JLabel levelTimerLabel = new JLabel("Time: " + time);
 	
+    /**
+     * ActionListern for timer counter
+     */
+    ActionListener timerCounter = new ActionListener() {
+        public void actionPerformed(ActionEvent e) {            
+            setTimerTime();
+            setTimerLabel();
+        }
+    };
+    
     /**
      * Key Listener for Previous and Next Levels
      */
@@ -79,8 +98,6 @@ public class BoulderDash extends JPanel {
                         if (isMoveable(gamefield[x + dx][y + dy])) {
                             //move the player
                             movePlayer(x, y, dx, dy);
-                            //increase the number of moves
-                            //incMoves();
                             //bc the gamefield is 2d, we need a boolean to check so we can get out
                             exit = true;
                             break;
@@ -133,6 +150,9 @@ public class BoulderDash extends JPanel {
         //if the player moved, update the tile it moved from
         if (moved) {
             gamefield[x][y] = prevTile;
+            //increase the number of moves
+            incMoves();
+            
         }
     }
     
@@ -194,6 +214,29 @@ public class BoulderDash extends JPanel {
     }
     
     /**
+     * Increase the number of moves a player has taken by 1 and redraw the JLabel
+     */
+    private void incMoves() {
+        moves += 1;
+        setMovesLabel();
+    }
+    
+    /**
+     * Reset the moves to zero
+     */
+    private void resetMoves() {
+        moves = 0;
+        setMovesLabel();
+    }
+    
+    /**
+     * Set the Moves Label
+     */
+    private void setMovesLabel() {
+        levelMovesLabel.setText("Moves: " + (moves));
+    }
+    
+    /**
      * Go to the next level
      */
     private void nextLevel () {
@@ -212,6 +255,28 @@ public class BoulderDash extends JPanel {
      */
     private void setLevelLabel() {
         levelLabel.setText("Level: " + (level));
+    }
+    
+    /**
+     * Reset the timer time
+     */
+    private void resetTimerTime() {
+        time = 0;
+        timer.restart();
+    }
+    
+    /**
+     * Set the level time
+     */
+    private void setTimerTime() {
+        time += 1;
+    }
+    
+    /**
+     * Set the level Timer Label
+     */
+    private void setTimerLabel() {
+        levelTimerLabel.setText("Time: " + time);
     }
     
 	public BoulderDash(String file) {	
@@ -235,6 +300,11 @@ public class BoulderDash extends JPanel {
         //add the level and move label
         this.add(levelLabel);
         this.add(levelDiamondsCollected);
+        this.add(levelMovesLabel);
+        this.add(levelTimerLabel);
+        
+        //set the timer
+        timer = new Timer (DELAY, timerCounter);
         
 		initLevel(level);
 	}
@@ -261,8 +331,8 @@ public class BoulderDash extends JPanel {
         }
         this.isReady = true;
         setLevelLabel();
-        //resetMoves();
-        //resetTimerTime();
+        resetMoves();
+        resetTimerTime();
         //writeLastLevel();
         repaint();
     }
