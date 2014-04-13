@@ -22,23 +22,24 @@ public class BoulderDash extends JPanel {
     //whether we should print the board
     private boolean isReady = false;
     
+	//gamefield's rectangles
+	private final int WIDTH = 40;
+    private final int HEIGHT = 22;
+	private BDTile[][] gamefield = new BDTile[WIDTH][HEIGHT];
+    
 	//gamefield Variables
 	private BDLevelReader blr;
 	private int numLevels;
 	private int level = 1;
     private int moves = 0;
     private int time = 0;
+    private int[][] rockStatus = new int[WIDTH][HEIGHT];
     
     //Timers
     private Timer levelTimer;
     private Timer levelActionsTimer;
     private static final int SECONDDELAY = 1000;
     private static final int LEVELACTIONDELAY = 200;
-
-	//gamefield's rectangles
-	private final int WIDTH = 40;
-    private final int HEIGHT = 22;
-	private BDTile[][] gamefield = new BDTile[WIDTH][HEIGHT];
 	
 	//level variables
 	private int diamondsCollected = 0;
@@ -123,9 +124,33 @@ public class BoulderDash extends JPanel {
      */
     ActionListener levelActions = new ActionListener() {
     	public void actionPerformed(ActionEvent e) {
-    		//loop through all level tiles
+    		updateBoard();
     	}
     };
+    
+    /**
+     * Loop through the entire board from the bottom to update it.
+     */
+    private void updateBoard () {
+        for (int y = HEIGHT - 2; y >= 0; y--) {
+            for (int x = 0; x < WIDTH; x++) {
+                updateRocks(x, y);
+            }
+        }
+    }
+    
+    private void updateRocks(int x, int y) {
+    	if (rockStatus[x][y] == 1) {
+    		if (isE(gamefield[x][y+1])) {
+    			gamefield[x][y] = BDTile.EMPTY;
+    			gamefield[x][y+1] = BDTile.ROCK;
+    			rockStatus[x][y] = 0;
+    			repaint();
+    		}
+    	}
+    	
+    	if (isRock(gamefield[x][y], gamefield[x][y+1])) rockStatus[x][y] = 1;
+    }
     
     /**
      * Move the player around the gamefield
@@ -292,6 +317,25 @@ public class BoulderDash extends JPanel {
         levelTimerLabel.setText("Time: " + time);
     }
     
+    /**
+     * Reset the levelActionsTimer
+     * @param file
+     */
+    private void resetLevelActionsTimer() {
+    	levelActionsTimer.restart();
+    }
+    
+    /**
+     * Initialize all rocks to stationary 0 status
+     */
+    private void initRocks() {
+        for (int y = HEIGHT - 1; y >= 0; y--) {
+            for (int x = 0; x < WIDTH; x++) {
+                rockStatus[x][y] = 0;
+            }
+        }
+    }
+    
 	public BoulderDash(String file) {	
 		//set the screen
         setFocusable(true);
@@ -343,10 +387,13 @@ public class BoulderDash extends JPanel {
                 this.gamefield[x][y] = blr.getTile(x, y);
             }
         }
+        
         this.isReady = true;
         setLevelLabel();
         resetMoves();
         resetLevelTimerTime();
+        resetLevelActionsTimer();
+        initRocks();
         //writeLastLevel();
         repaint();
     }
@@ -371,7 +418,7 @@ public class BoulderDash extends JPanel {
                 if (gamefield[x][y].toString() == "FIREFLY")  g2.setPaint(Color.ORANGE);
                 if (gamefield[x][y].toString() == "BUTTERFLY") g2.setPaint(Color.CYAN);
                 if (gamefield[x][y].toString() == "EXIT")  g2.setPaint(Color.BLUE);
-                if (gamefield[x][y].toString() == "PLAYER") g2.setPaint(Color.RED);;
+                if (gamefield[x][y].toString() == "PLAYER") g2.setPaint(Color.RED);
                 g2.fill(r);
             }    
         }
