@@ -28,8 +28,12 @@ public class BoulderDash extends JPanel {
 	private int level = 1;
     private int moves = 0;
     private int time = 0;
+    
+    //Timers
     private Timer levelTimer;
-    private static final int DELAY = 1000;
+    private Timer levelActionsTimer;
+    private static final int SECONDDELAY = 1000;
+    private static final int LEVELACTIONDELAY = 200;
 
 	//gamefield's rectangles
 	private final int WIDTH = 40;
@@ -48,8 +52,8 @@ public class BoulderDash extends JPanel {
      */
     ActionListener timerCounter = new ActionListener() {
         public void actionPerformed(ActionEvent e) {            
-            setTimerTime();
-            setTimerLabel();
+            setLevelTimerTime();
+            setLevelTimerLabel();
         }
     };
     
@@ -269,7 +273,7 @@ public class BoulderDash extends JPanel {
     /**
      * Reset the timer time
      */
-    private void resetTimerTime() {
+    private void resetLevelTimerTime() {
         time = 0;
         levelTimer.restart();
     }
@@ -277,14 +281,14 @@ public class BoulderDash extends JPanel {
     /**
      * Set the level time
      */
-    private void setTimerTime() {
+    private void setLevelTimerTime() {
         time += 1;
     }
     
     /**
      * Set the level Timer Label
      */
-    private void setTimerLabel() {
+    private void setLevelTimerLabel() {
         levelTimerLabel.setText("Time: " + time);
     }
     
@@ -312,8 +316,9 @@ public class BoulderDash extends JPanel {
         this.add(levelMovesLabel);
         this.add(levelTimerLabel);
         
-        //set the timer
-        levelTimer = new Timer (DELAY, timerCounter);
+        //start the timers
+        levelTimer = new Timer (SECONDDELAY, timerCounter);
+        levelActionsTimer = new Timer (LEVELACTIONDELAY, levelActions);
         
 		initLevel(level);
 	}
@@ -341,7 +346,7 @@ public class BoulderDash extends JPanel {
         this.isReady = true;
         setLevelLabel();
         resetMoves();
-        resetTimerTime();
+        resetLevelTimerTime();
         //writeLastLevel();
         repaint();
     }
