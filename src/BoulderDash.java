@@ -28,7 +28,7 @@ public class BoulderDash extends JPanel {
 	private int level = 1;
     private int moves = 0;
     private int time = 0;
-    private Timer timer;
+    private Timer levelTimer;
     private static final int DELAY = 1000;
 
 	//gamefield's rectangles
@@ -44,7 +44,7 @@ public class BoulderDash extends JPanel {
     private JLabel levelTimerLabel = new JLabel("Time: " + time);
 	
     /**
-     * ActionListern for timer counter
+     * ActionListener for levelTimer counter
      */
     ActionListener timerCounter = new ActionListener() {
         public void actionPerformed(ActionEvent e) {            
@@ -114,6 +114,15 @@ public class BoulderDash extends JPanel {
         }
     }
 	
+    /**
+     * ActionListener for timer level actions
+     */
+    ActionListener levelActions = new ActionListener() {
+    	public void actionPerformed(ActionEvent e) {
+    		//loop through all level tiles
+    	}
+    };
+    
     /**
      * Move the player around the gamefield
      * @param nextTile the next tile the player is moving to
@@ -262,7 +271,7 @@ public class BoulderDash extends JPanel {
      */
     private void resetTimerTime() {
         time = 0;
-        timer.restart();
+        levelTimer.restart();
     }
     
     /**
@@ -304,7 +313,7 @@ public class BoulderDash extends JPanel {
         this.add(levelTimerLabel);
         
         //set the timer
-        timer = new Timer (DELAY, timerCounter);
+        levelTimer = new Timer (DELAY, timerCounter);
         
 		initLevel(level);
 	}
