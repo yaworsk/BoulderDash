@@ -28,6 +28,7 @@ public class BoulderDash extends JPanel {
 	private BDTile[][] gamefield = new BDTile[WIDTH][HEIGHT];
     
 	//gamefield Variables
+	private boolean playerAlive = true;
 	private BDLevelReader blr;
 	private int numLevels;
 	private int level = 1;
@@ -39,7 +40,7 @@ public class BoulderDash extends JPanel {
     private Timer levelTimer;
     private Timer levelActionsTimer;
     private static final int SECONDDELAY = 1000;
-    private static final int LEVELACTIONDELAY = 200;
+    private static final int LEVELACTIONDELAY = 2000;
 	
 	//level variables
 	private int diamondsCollected = 0;
@@ -47,7 +48,8 @@ public class BoulderDash extends JPanel {
     private JLabel levelDiamondsCollected = new JLabel ("Diamonds Collected: " + (diamondsCollected));
     private JLabel levelMovesLabel = new JLabel ("Moves: " + (moves));
     private JLabel levelTimerLabel = new JLabel("Time: " + time);
-	
+    private JLabel levelPlayerStatus = new JLabel("");
+    
     /**
      * ActionListener for levelTimer counter
      */
@@ -96,29 +98,40 @@ public class BoulderDash extends JPanel {
             //bottom
             if (e.getKeyCode() == 40) dy = 1;
             
-            //loop through the gamefield to find the player and move them
-            for (int x = 0; x <= gamefield.length - 1; x++) {
-                for (int y = 0; y <= gamefield[x].length - 1; y++) {
-                    if (gamefield[x][y].toString() == "PLAYER") {
-                        if (isMoveable(gamefield[x + dx][y + dy])) {
-                            //move the player
-                            movePlayer(x, y, dx, dy);
-                            //bc the gamefield is 2d, we need a boolean to check so we can get out
-                            exit = true;
-                            break;
-                        } //end can move
-                    } //end if player
-                } //end loop columns
-                if (exit) break;
-            } //end loop rows
-            repaint();
-/*            if (checkWin()) {
-                nextLevel();
-                initLevel(level);
-            }*/
+            if (playerAlive) {
+	            //loop through the gamefield to find the player and move them
+	            for (int x = 0; x <= gamefield.length - 1; x++) {
+	                for (int y = 0; y <= gamefield[x].length - 1; y++) {
+	                    if (gamefield[x][y].toString() == "PLAYER") {
+	                        if (isMoveable(gamefield[x + dx][y + dy])) {
+	                            //move the player
+	                            movePlayer(x, y, dx, dy);
+	                            //bc the gamefield is 2d, we need a boolean to check so we can get out
+	                            exit = true;
+	                            break;
+	                        } //end can move
+	                    } //end if player
+	                } //end loop columns
+	                if (exit) break;
+	            } //end loop rows
+	            repaint();
+	/*            if (checkWin()) {
+	                nextLevel();
+	                initLevel(level);
+	            }*/
+            }
         }
     }
 	
+    /**
+     * 
+     */
+    public void playerDied() {
+    	playerAlive = false;
+    	stopLevelTimer();
+    	levelPlayerStatus.setText("You Died.");
+    }
+    
     /**
      * ActionListener for timer level actions
      */
@@ -133,7 +146,7 @@ public class BoulderDash extends JPanel {
      */
     private void updateBoard () {
         for (int y = HEIGHT - 2; y >= 0; y--) {
-            for (int x = 0; x < WIDTH; x++) {
+            for (int x = 1; x < WIDTH - 1; x++) {
                 updateRocks(x, y);
             }
         }
@@ -141,15 +154,37 @@ public class BoulderDash extends JPanel {
     
     private void updateRocks(int x, int y) {
     	if (rockStatus[x][y] == 1) {
+			rockStatus[x][y] = 0;
+			
+			if (isPlayer(gamefield[x][y+1])) {
+				gamefield[x][y] = BDTile.EMPTY;
+				gamefield[x][y+1] = BDTile.ROCK;
+				playerDied();
+			}
+			
     		if (isE(gamefield[x][y+1])) {
     			gamefield[x][y] = BDTile.EMPTY;
     			gamefield[x][y+1] = BDTile.ROCK;
-    			rockStatus[x][y] = 0;
-    			repaint();
+    			rockStatus[x][y+1] = 1;
+    		} else if (isE(gamefield[x+1][y+1])) {
+    			gamefield[x][y] = BDTile.EMPTY;
+    			gamefield[x+1][y+1] = BDTile.ROCK; 
+    			rockStatus[x+1][y+1] = 1;
+    		} else if (isE(gamefield[x-1][y+1])){
+    			gamefield[x][y] = BDTile.EMPTY;
+    			gamefield[x - 1][y+1] = BDTile.ROCK;
+    			rockStatus[x - 1][y+1] = 1;
     		}
+    		
+			repaint();
     	}
     	
-    	if (isRock(gamefield[x][y], gamefield[x][y+1])) rockStatus[x][y] = 1;
+    	//update the rock to falling if the square below it is empty
+    	if (
+    			isRock(gamefield[x][y], gamefield[x][y+1]) ||
+    			isRock(gamefield[x][y], gamefield[x+1][y+1]) ||
+    			isRock(gamefield[x][y], gamefield[x-1][y+1])
+    		) rockStatus[x][y] = 1;
     }
     
     /**
@@ -252,6 +287,16 @@ public class BoulderDash extends JPanel {
     }
     
     /**
+     * Check whether a tile is the player
+     * @param currentTile The current tile
+     * @param nextTile
+     * @return
+     */
+    public boolean isPlayer(BDTile tile) {
+    	return (tile.toString() == "PLAYER") ? true : false;
+    }
+    
+    /**
      * Increase the number of moves a player has taken by 1 and redraw the JLabel
      */
     private void incMoves() {
@@ -317,6 +362,10 @@ public class BoulderDash extends JPanel {
         levelTimerLabel.setText("Time: " + time);
     }
     
+    private void stopLevelTimer() {
+    	levelTimer.stop();
+    }
+    
     /**
      * Reset the levelActionsTimer
      * @param file
@@ -360,6 +409,10 @@ public class BoulderDash extends JPanel {
         this.add(levelMovesLabel);
         this.add(levelTimerLabel);
         
+        //reset the player
+        this.add(levelPlayerStatus);
+        levelPlayerStatus.setText("");
+        
         //start the timers
         levelTimer = new Timer (SECONDDELAY, timerCounter);
         levelActionsTimer = new Timer (LEVELACTIONDELAY, levelActions);
@@ -394,6 +447,8 @@ public class BoulderDash extends JPanel {
         resetLevelTimerTime();
         resetLevelActionsTimer();
         initRocks();
+        playerAlive = true;
+        
         //writeLastLevel();
         repaint();
     }
