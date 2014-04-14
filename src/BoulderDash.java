@@ -19,6 +19,9 @@ import javax.swing.JPanel;
 import javax.swing.Timer;
 
 public class BoulderDash extends JPanel {
+	//debugging
+	private final boolean debug = true;
+	
     //whether we should print the board
     private boolean isReady = false;
     
@@ -35,12 +38,13 @@ public class BoulderDash extends JPanel {
     private int moves = 0;
     private int time = 0;
     private int[][] rockStatus = new int[WIDTH][HEIGHT];
+    private int numRocks = 0;
     
     //Timers
     private Timer levelTimer;
     private Timer levelActionsTimer;
     private static final int SECONDDELAY = 1000;
-    private static final int LEVELACTIONDELAY = 2000;
+    private static final int LEVELACTIONDELAY = 200;
 	
 	//level variables
 	private int diamondsCollected = 0;
@@ -84,7 +88,7 @@ public class BoulderDash extends JPanel {
      * Key Listener for Directional Controls
      */
     private class ControlsKeyListener extends KeyAdapter {
-        public void keyPressed(KeyEvent e) {
+        public synchronized void keyPressed(KeyEvent e) {
             boolean exit = false;
             int dx = 0;
             int dy = 0;
@@ -122,29 +126,45 @@ public class BoulderDash extends JPanel {
             }
         }
     }
-	
-    /**
-     * 
-     */
-    public void playerDied() {
-    	playerAlive = false;
-    	stopLevelTimer();
-    	levelPlayerStatus.setText("You Died.");
-    }
     
     /**
      * ActionListener for timer level actions
      */
     ActionListener levelActions = new ActionListener() {
-    	public void actionPerformed(ActionEvent e) {
+    	public synchronized void actionPerformed(ActionEvent e) {
     		updateBoard();
     	}
     };
+	
+    /**
+     * Act on the player dying including setting player alive to false,
+     * stopping the level time and updating the status message.
+     */
+    public void playerDied() {
+    	playerAlive = false;
+    	stopLevelTimer();
+    	levelPlayerStatus.setText("You Died.");
+    	
+    	if (debug) countRocks();
+    }
+    
+    /**
+     * Debugging to count the number of rocks and make sure nothing is lost.
+     */
+    public void countRocks() {
+        for (int y = HEIGHT - 1; y >= 0; y--) {
+            for (int x = 1; x < WIDTH - 1; x++) {
+                if (gamefield[x][y] == BDTile.ROCK) numRocks++;
+            }
+        }
+        System.out.println(numRocks);
+        numRocks = 0;
+    }
     
     /**
      * Loop through the entire board from the bottom to update it.
      */
-    private void updateBoard () {
+    private void  updateBoard () {
         for (int y = HEIGHT - 2; y >= 0; y--) {
             for (int x = 1; x < WIDTH - 1; x++) {
                 updateRocks(x, y);
@@ -153,13 +173,16 @@ public class BoulderDash extends JPanel {
     }
     
     private void updateRocks(int x, int y) {
-    	if (rockStatus[x][y] == 1) {
+    	if (rockStatus[x][y] == 1 && playerAlive) {
 			rockStatus[x][y] = 0;
 			
 			if (isPlayer(gamefield[x][y+1])) {
 				gamefield[x][y] = BDTile.EMPTY;
+				//TODO: CHANGE TO A DIFFERENT TYPE
 				gamefield[x][y+1] = BDTile.ROCK;
 				playerDied();
+				repaint();
+				return;
 			}
 			
     		if (isE(gamefield[x][y+1])) {
@@ -181,9 +204,10 @@ public class BoulderDash extends JPanel {
     	
     	//update the rock to falling if the square below it is empty
     	if (
+    			//is rock and below is empty
     			isRock(gamefield[x][y], gamefield[x][y+1]) ||
-    			isRock(gamefield[x][y], gamefield[x+1][y+1]) ||
-    			isRock(gamefield[x][y], gamefield[x-1][y+1])
+    			(isRock(gamefield[x][y], gamefield[x+1][y+1]) && isRock(gamefield[x][y], gamefield[x+1][y])) ||
+    			(isRock(gamefield[x][y], gamefield[x-1][y+1]) && isRock(gamefield[x][y], gamefield[x-1][y]))
     		) rockStatus[x][y] = 1;
     }
     
@@ -408,10 +432,7 @@ public class BoulderDash extends JPanel {
         this.add(levelDiamondsCollected);
         this.add(levelMovesLabel);
         this.add(levelTimerLabel);
-        
-        //reset the player
         this.add(levelPlayerStatus);
-        levelPlayerStatus.setText("");
         
         //start the timers
         levelTimer = new Timer (SECONDDELAY, timerCounter);
@@ -448,6 +469,9 @@ public class BoulderDash extends JPanel {
         resetLevelActionsTimer();
         initRocks();
         playerAlive = true;
+        levelPlayerStatus.setText("");
+        
+        if (debug) countRocks();
         
         //writeLastLevel();
         repaint();
