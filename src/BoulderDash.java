@@ -38,6 +38,7 @@ public class BoulderDash extends JPanel {
     private int moves = 0;
     private int time = 0;
     private int[][] rockStatus = new int[WIDTH][HEIGHT];
+    private int[][] diamondStatus = new int[WIDTH][HEIGHT];
     private int numRocks = 0;
     
     //Timers
@@ -154,6 +155,9 @@ public class BoulderDash extends JPanel {
         numRocks = 0;
     }
     
+    /**
+     * React to butterflys and fireflys exploding
+     */
     private void explode(int x, int y, BDTile tile) {
     	for (int i = -1; i < 2; i++) {
     		for (int h = -1; h < 2; h++) {
@@ -173,6 +177,7 @@ public class BoulderDash extends JPanel {
         for (int y = HEIGHT - 2; y >= 0; y--) {
             for (int x = 1; x < WIDTH - 1; x++) {
                 updateRocks(x, y);
+                updateDiamonds(x,y);
             }
         }
     }
@@ -235,6 +240,39 @@ public class BoulderDash extends JPanel {
     			(isRockMoveable(gamefield[x][y], gamefield[x+1][y+1]) && isRockMoveable(gamefield[x][y], gamefield[x+1][y])) ||
     			(isRockMoveable(gamefield[x][y], gamefield[x-1][y+1]) && isRockMoveable(gamefield[x][y], gamefield[x-1][y]))
     		) rockStatus[x][y] = 1;
+    }
+    
+    private void updateDiamonds(int x, int y) {
+    	if (diamondStatus[x][y] == 1 && playerAlive) {
+			diamondStatus[x][y] = 0;
+			//move the rock to empty spaces
+			if (isE(gamefield[x][y+1])) {
+				gamefield[x][y] = BDTile.EMPTY;
+				gamefield[x][y+1] = BDTile.DIAMOND;
+				diamondStatus[x][y+1] = 1;
+				repaint();
+				return;
+			} else if (isE(gamefield[x+1][y+1])) {
+				gamefield[x][y] = BDTile.EMPTY;
+				gamefield[x+1][y+1] = BDTile.DIAMOND; 
+				diamondStatus[x+1][y+1] = 1;
+				repaint();
+				return;
+			} else if (isE(gamefield[x-1][y+1])){
+				gamefield[x][y] = BDTile.EMPTY;
+				gamefield[x-1][y+1] = BDTile.DIAMOND;
+				diamondStatus[x-1][y+1] = 1;
+				repaint();
+				return;
+			}
+    	}
+	
+	//update the diamond to falling if the square below it is empty
+	if (
+			isDiamondMoveable(gamefield[x][y], gamefield[x][y+1]) ||
+			(isDiamondMoveable(gamefield[x][y], gamefield[x+1][y+1]) && isDiamondMoveable(gamefield[x][y], gamefield[x+1][y])) ||
+			(isDiamondMoveable(gamefield[x][y], gamefield[x-1][y+1]) && isDiamondMoveable(gamefield[x][y], gamefield[x-1][y]))
+		) diamondStatus[x][y] = 1;
     }
     
     public synchronized boolean updatePlayer(int x, int y, int dx, int dy) {
@@ -383,6 +421,17 @@ public class BoulderDash extends JPanel {
     }
     
     /**
+     * Check to see if a tile is a diamond and can be moved
+     * 
+     * @param nextTile The next tile the player is to move on to
+     * @param doubleNextTile The tile the next tile is to be moved to
+     * @return True if the next tile can be moved to the subsequent tile
+     */
+    public boolean isDiamondMoveable (BDTile tile, BDTile nextTile) {
+        return (tile.toString() == "DIAMOND"  && nextTile.toString() == "EMPTY") ? true : false;
+    }
+    
+    /**
      * Check whether a tile is the player
      * @param currentTile The current tile
      * @param nextTile
@@ -476,10 +525,11 @@ public class BoulderDash extends JPanel {
     /**
      * Initialize all rocks to stationary 0 status
      */
-    private void initRocks() {
+    private void initRocksDiamonds() {
         for (int y = HEIGHT - 1; y >= 0; y--) {
             for (int x = 0; x < WIDTH; x++) {
                 rockStatus[x][y] = 0;
+                diamondStatus[x][y] = 0;
             }
         }
     }
@@ -542,7 +592,7 @@ public class BoulderDash extends JPanel {
         resetMoves();
         resetLevelTimerTime();
         resetLevelActionsTimer();
-        initRocks();
+        initRocksDiamonds();
         playerAlive = true;
         levelPlayerStatus.setText("");
         
