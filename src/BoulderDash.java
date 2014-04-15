@@ -88,7 +88,7 @@ public class BoulderDash extends JPanel {
      * Key Listener for Directional Controls
      */
     private class ControlsKeyListener extends KeyAdapter {
-        public synchronized void keyPressed(KeyEvent e) {
+        public void keyPressed(KeyEvent e) {
             boolean exit = false;
             int dx = 0;
             int dy = 0;
@@ -106,15 +106,8 @@ public class BoulderDash extends JPanel {
 	            //loop through the gamefield to find the player and move them
 	            for (int x = 0; x <= gamefield.length - 1; x++) {
 	                for (int y = 0; y <= gamefield[x].length - 1; y++) {
-	                    if (gamefield[x][y].toString() == "PLAYER") {
-	                        if (isMoveable(gamefield[x + dx][y + dy])) {
-	                            //move the player
-	                            movePlayer(x, y, dx, dy);
-	                            //bc the gamefield is 2d, we need a boolean to check so we can get out
-	                            exit = true;
-	                            break;
-	                        } //end can move
-	                    } //end if player
+	                    exit = updatePlayer(x, y, dx, dy);
+	                    if (exit) break;
 	                } //end loop columns
 	                if (exit) break;
 	            } //end loop rows
@@ -131,7 +124,7 @@ public class BoulderDash extends JPanel {
      * ActionListener for timer level actions
      */
     ActionListener levelActions = new ActionListener() {
-    	public synchronized void actionPerformed(ActionEvent e) {
+    	public void actionPerformed(ActionEvent e) {
     		updateBoard();
     	}
     };
@@ -161,10 +154,22 @@ public class BoulderDash extends JPanel {
         numRocks = 0;
     }
     
+    private void explode(int x, int y, BDTile tile) {
+    	for (int i = -1; i < 2; i++) {
+    		for (int h = -1; h < 2; h++) {
+    			if (!isWall(gamefield[x+i][y+h])) {
+    				if (isPlayer(gamefield[x+i][y+h])) playerDied();
+    				if (isFireFly(tile)) gamefield[x+i][y+h] = BDTile.EMPTY;
+    				if (isButterFly(tile)) gamefield[x+i][y+h] = BDTile.DIAMOND;
+    			}
+    		}
+    	}
+    }
+    
     /**
      * Loop through the entire board from the bottom to update it.
      */
-    private void  updateBoard () {
+    private synchronized void updateBoard () {
         for (int y = HEIGHT - 2; y >= 0; y--) {
             for (int x = 1; x < WIDTH - 1; x++) {
                 updateRocks(x, y);
@@ -176,6 +181,7 @@ public class BoulderDash extends JPanel {
     	if (rockStatus[x][y] == 1 && playerAlive) {
 			rockStatus[x][y] = 0;
 			
+			//check for the player
 			if (isPlayer(gamefield[x][y+1])) {
 				gamefield[x][y] = BDTile.EMPTY;
 				//TODO: CHANGE TO A DIFFERENT TYPE
@@ -184,31 +190,63 @@ public class BoulderDash extends JPanel {
 				repaint();
 				return;
 			}
-			
+    		
+    		//check for fireflys
+    		if (isFireFly(gamefield[x][y+1])){
+    			explode(x, y+1, gamefield[x][y+1]);
+    			repaint();
+    			return;
+    		}
+    		
+    		//check for fireflys
+    		if (isButterFly(gamefield[x][y+1])){
+    			explode(x, y+1, gamefield[x][y+1]);
+    			repaint();
+    			return;
+    		}
+
+			//move the rock to empty spaces
     		if (isE(gamefield[x][y+1])) {
     			gamefield[x][y] = BDTile.EMPTY;
     			gamefield[x][y+1] = BDTile.ROCK;
     			rockStatus[x][y+1] = 1;
+    			repaint();
+    			return;
     		} else if (isE(gamefield[x+1][y+1])) {
     			gamefield[x][y] = BDTile.EMPTY;
     			gamefield[x+1][y+1] = BDTile.ROCK; 
     			rockStatus[x+1][y+1] = 1;
+    			repaint();
+    			return;
     		} else if (isE(gamefield[x-1][y+1])){
     			gamefield[x][y] = BDTile.EMPTY;
-    			gamefield[x - 1][y+1] = BDTile.ROCK;
-    			rockStatus[x - 1][y+1] = 1;
+    			gamefield[x-1][y+1] = BDTile.ROCK;
+    			rockStatus[x-1][y+1] = 1;
+    			repaint();
+    			return;
     		}
     		
-			repaint();
     	}
     	
     	//update the rock to falling if the square below it is empty
     	if (
     			//is rock and below is empty
-    			isRock(gamefield[x][y], gamefield[x][y+1]) ||
-    			(isRock(gamefield[x][y], gamefield[x+1][y+1]) && isRock(gamefield[x][y], gamefield[x+1][y])) ||
-    			(isRock(gamefield[x][y], gamefield[x-1][y+1]) && isRock(gamefield[x][y], gamefield[x-1][y]))
+    			isRockMoveable(gamefield[x][y], gamefield[x][y+1]) ||
+    			(isRockMoveable(gamefield[x][y], gamefield[x+1][y+1]) && isRockMoveable(gamefield[x][y], gamefield[x+1][y])) ||
+    			(isRockMoveable(gamefield[x][y], gamefield[x-1][y+1]) && isRockMoveable(gamefield[x][y], gamefield[x-1][y]))
     		) rockStatus[x][y] = 1;
+    }
+    
+    public synchronized boolean updatePlayer(int x, int y, int dx, int dy) {
+	    if (gamefield[x][y].toString() == "PLAYER") {
+	        if (isMoveable(gamefield[x + dx][y + dy])) {
+	            //move the player
+	            movePlayer(x, y, dx, dy);
+	            //bc the gamefield is 2d, we need a boolean to check so we can get out
+	            return true;
+	        } //end can move
+	    } //end if player
+	    return false;
     }
     
     /**
@@ -237,8 +275,9 @@ public class BoulderDash extends JPanel {
             moved = true;
         }
         
-        //check if the next tile is a box
-        if (isRock(nextTile, gamefield[x + dx *2][y + dy *2]) && !moved) {
+        //check if the next tile is a moveable rock
+        if (isRockMoveable(nextTile, gamefield[x + dx *2][y + dy *2]) && !moved) {
+        	rockStatus[x +dx][y] = 0;
             gamefield[x + dx][y + dy] = BDTile.PLAYER;
             gamefield[x + dx * 2][y + dy * 2] = BDTile.ROCK;
             moved = true;
@@ -254,60 +293,93 @@ public class BoulderDash extends JPanel {
     }
     
     /**
-     * Check to see if the player can move to the next tile
+     * Check to see if the player can move to a tile
      * 
-     * @param nextTile The next tile the player is to move on to
+     * @param Tile The tile to check if moveable
      * @return
      */
-    public boolean isMoveable (BDTile nextTile) {
-        return (nextTile.toString() == "EMPTY" || nextTile.toString() == "ROCK" || nextTile.toString() == "DIRT" || nextTile.toString() == "DIAMOND") ? true : false;
+    public boolean isMoveable (BDTile tile) {
+        return (tile.toString() == "EMPTY" || tile.toString() == "ROCK" || tile.toString() == "DIRT" || tile.toString() == "DIAMOND") ? true : false;
+    }
+
+    /**
+     * Check to see if a tile is a wall
+     * 
+     * @param tile 
+     * 	A tile to check if it is a wall
+     * @return 
+     * 	True if tile is a wall tile
+     */
+    public boolean isWall (BDTile tile) {
+        return (tile.toString() == "WALL") ? true : false;
     }
     
     /**
-     * Check to see if the next tile is an empty
+     * Check to see if a tile is an empty
      * 
-     * @param nextTile 
-     * 	The next tile the player is to move on to
+     * @param tile 
+     * 	A tile to check if empty
      * @return 
      * 	True if the next tile is an empty tile
      */
-    public boolean isE (BDTile nextTile) {
-        return (nextTile.toString() == "EMPTY") ? true : false;
+    public boolean isE (BDTile tile) {
+        return (tile.toString() == "EMPTY") ? true : false;
     }
     
     /**
-     * Check to see if the next tile is a dirt tile
+     * Check to see if a tile is a dirt tile
      * 
      * @param nextTile 
-     * 	The next tile the player is to move on to
+     * 	A tile to check if it is dirt
      * @return 
      * 	True if the next tile is a dirt tile
      */
-    public boolean isDirt (BDTile nextTile) {
-        return (nextTile.toString() == "DIRT") ? true : false;
+    public boolean isDirt (BDTile tile) {
+        return (tile.toString() == "DIRT") ? true : false;
     }
     
     /**
-     * Check to see if the next tile is a diamond tile
+     * Check to see if a tile is a diamond tile
      * 
-     * @param nextTile 
-     * 	The next tile the player is to move on to
+     * @param tile 
+     * 	A tile to check whether it is a diamond
      * @return 
      * 	True if the next tile is a diamond tile
      */
-    public boolean isDiamond (BDTile nextTile) {
-        return (nextTile.toString() == "DIAMOND") ? true : false;
+    public boolean isDiamond (BDTile tile) {
+        return (tile.toString() == "DIAMOND") ? true : false;
     }
     
     /**
-     * Check to see if the next tile is a rock and can be moved
+     * Check to see if a tile is a rock
+     */
+    public boolean isRock (BDTile tile) {
+    	return (tile.toString() == "ROCK") ? true : false;
+    }
+
+    /**
+     * Check to see if a tile is a firefly
+     */
+    public boolean isFireFly (BDTile tile) {
+    	return (tile.toString() == "FIREFLY") ? true : false;
+    }
+    
+    /**
+     * Check to see if a tile is a butterfly
+     */
+    public boolean isButterFly (BDTile tile) {
+    	return (tile.toString() == "BUTTERFLY") ? true : false;
+    }
+        
+    /**
+     * Check to see if a tile is a rock and can be moved
      * 
      * @param nextTile The next tile the player is to move on to
      * @param doubleNextTile The tile the next tile is to be moved to
      * @return True if the next tile can be moved to the subsequent tile
      */
-    public boolean isRock (BDTile nextTile, BDTile doubleNextTile) {
-        return (nextTile.toString() == "ROCK"  && doubleNextTile.toString() == "EMPTY") ? true : false;
+    public boolean isRockMoveable (BDTile tile, BDTile nextTile) {
+        return (tile.toString() == "ROCK"  && nextTile.toString() == "EMPTY") ? true : false;
     }
     
     /**
@@ -386,6 +458,9 @@ public class BoulderDash extends JPanel {
         levelTimerLabel.setText("Time: " + time);
     }
     
+    /**
+     * Stop the level timer
+     */
     private void stopLevelTimer() {
     	levelTimer.stop();
     }
@@ -494,7 +569,7 @@ public class BoulderDash extends JPanel {
                 if (gamefield[x][y].toString() == "DIAMOND")  g2.setPaint(Color.MAGENTA);
                 if (gamefield[x][y].toString() == "FALLINGDIAMOND")  g2.setPaint(Color.YELLOW);
                 if (gamefield[x][y].toString() == "AMOEBA")  g2.setPaint(Color.PINK);
-                if (gamefield[x][y].toString() == "FIREFLY")  g2.setPaint(Color.ORANGE);
+                if (gamefield[x][y].toString() == "FIREFLY") g2.setPaint(Color.ORANGE);
                 if (gamefield[x][y].toString() == "BUTTERFLY") g2.setPaint(Color.CYAN);
                 if (gamefield[x][y].toString() == "EXIT")  g2.setPaint(Color.BLUE);
                 if (gamefield[x][y].toString() == "PLAYER") g2.setPaint(Color.RED);
