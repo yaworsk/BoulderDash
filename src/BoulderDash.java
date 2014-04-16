@@ -39,6 +39,7 @@ public class BoulderDash extends JPanel {
     private int time = 0;
     private int[][] rockStatus = new int[WIDTH][HEIGHT];
     private int[][] diamondStatus = new int[WIDTH][HEIGHT];
+    private int[][] fireFlyDirection = new int[WIDTH][HEIGHT];
     private int[][] fireFlyStatus = new int[WIDTH][HEIGHT];
     
     //Timers
@@ -152,7 +153,6 @@ public class BoulderDash extends JPanel {
     				if (isPlayer(gamefield[x+i][y+h])) playerDied();
     				if (isFireFly(tile)) gamefield[x+i][y+h] = BDTile.EMPTY;
     				if (isButterFly(tile)) gamefield[x+i][y+h] = BDTile.DIAMOND;
-    				repaint();
     			}
     		}
     	}
@@ -162,27 +162,20 @@ public class BoulderDash extends JPanel {
      * Loop through the entire board from the bottom to update it.
      */
     private synchronized void updateBoard () {
-        boolean moved = false;
     	for (int y = HEIGHT - 2; y >= 0; y--) {
             for (int x = 1; x < WIDTH - 1; x++) {
                 if (gamefield[x][y] == BDTile.ROCK) updateRocks(x, y);
                 if (gamefield[x][y] == BDTile.DIAMOND) updateDiamonds(x, y);
-                if (gamefield[x][y] == BDTile.FIREFLY) {
-                	if (moved == false) {
-                		moved = updateFireFlys(x, y);
-                	} else {
-                		moved = false;
-                	}
-                }
+                if (gamefield[x][y] == BDTile.FIREFLY) updateFireFlys(x, y);
+                repaint();
             }
-            moved = false;
         }
     }
     
     /**
      * Update fireflys
      */
-    private boolean updateFireFlys(int x, int y) {
+    private void updateFireFlys(int x, int y) {
     	if (
     		gamefield[x+1][y] == BDTile.PLAYER || 
     		gamefield[x][y+1] == BDTile.PLAYER ||
@@ -190,62 +183,54 @@ public class BoulderDash extends JPanel {
     		gamefield[x][y-1] == BDTile.PLAYER 
     		) {
     		explode(x, y, gamefield[x][y]);
-    		return false;
-    	}
-    	
-    	if (fireFlyStatus[x][y] == 0) {
-    		if (isE(gamefield[x+1][y])) {
-    			gamefield[x][y] = BDTile.EMPTY;
-    			gamefield[x+1][y] = BDTile.FIREFLY;
-    			fireFlyStatus[x+1][y] = 0;
-    			repaint();
-    			return true;
-    		} else {
-    			fireFlyStatus[x][y] = 1;
-    			return false;
-    		}
+    		return;
     	}
     	
     	if (fireFlyStatus[x][y] == 1) {
-    		if (isE(gamefield[x][y+1])) {
-    			gamefield[x][y] = BDTile.EMPTY;
-    			gamefield[x][y+1] = BDTile.FIREFLY;
-    			fireFlyStatus[x][y+1] = 1;
-    			repaint();
-    			return true;
-    		} else {
-    			fireFlyStatus[x][y] = 2;
-    			return false;
-    		}
+	    	if (fireFlyDirection[x][y] == 0) {
+	    		if (isE(gamefield[x+1][y])) {
+	    			gamefield[x][y] = BDTile.EMPTY;
+	    			gamefield[x+1][y] = BDTile.FIREFLY;
+	    			fireFlyDirection[x+1][y] = 0;
+	    			fireFlyStatus[x+1][y] = 0;
+	    		} else {
+	    			fireFlyDirection[x][y] = 1;
+	    		}
+	    	}
+	    	
+	    	if (fireFlyDirection[x][y] == 1) {
+	    		if (isE(gamefield[x][y+1])) {
+	    			gamefield[x][y] = BDTile.EMPTY;
+	    			gamefield[x][y+1] = BDTile.FIREFLY;
+	    			fireFlyDirection[x][y+1] = 1;
+	    		} else {
+	    			fireFlyDirection[x][y] = 2;
+	    		}
+	    	}
+	    	
+	    	if (fireFlyDirection[x][y] == 2) {
+	    		if (isE(gamefield[x-1][y])) {
+	    			gamefield[x][y] = BDTile.EMPTY;
+	    			gamefield[x-1][y] = BDTile.FIREFLY;
+	    			fireFlyDirection[x-1][y] = 2;
+	    		} else {
+	    			fireFlyDirection[x][y] = 3;
+	    		}
+	    	}
+	    	
+	    	if (fireFlyDirection[x][y] == 3) {
+	    		if (isE(gamefield[x][y-1])) {
+	    			gamefield[x][y] = BDTile.EMPTY;
+	    			gamefield[x][y-1] = BDTile.FIREFLY;
+	    			fireFlyDirection[x][y-1] = 3;
+	    			fireFlyStatus[x][y-1] = 0;
+	    		} else {
+	    			fireFlyDirection[x][y] = 0;
+	    		}
+	    	}
+    	} else {
+    		fireFlyStatus[x][y] = 1;
     	}
-    	
-    	if (fireFlyStatus[x][y] == 2) {
-    		if (isE(gamefield[x-1][y])) {
-    			gamefield[x][y] = BDTile.EMPTY;
-    			gamefield[x-1][y] = BDTile.FIREFLY;
-    			fireFlyStatus[x-1][y] = 2;
-    			repaint();
-    			return true;
-    		} else {
-    			fireFlyStatus[x][y] = 3;
-    			return false;
-    		}
-    	}
-    	
-    	if (fireFlyStatus[x][y] == 3) {
-    		if (isE(gamefield[x][y-1])) {
-    			gamefield[x][y] = BDTile.EMPTY;
-    			gamefield[x][y-1] = BDTile.FIREFLY;
-    			fireFlyStatus[x][y-1] = 3;
-    			repaint();
-    			return true;
-    		} else {
-    			fireFlyStatus[x][y] = 0;
-    			return false;
-    		}
-    	}
-    	
-    	return false;
     }
     
     /**
@@ -261,14 +246,12 @@ public class BoulderDash extends JPanel {
 				//TODO: CHANGE TO A DIFFERENT TYPE
 				gamefield[x][y+1] = BDTile.ROCK;
 				playerDied();
-				repaint();
 				return;
 			}
     		
     		//check for fireflys
     		if (isFireFly(gamefield[x][y+1])){
     			explode(x, y+1, gamefield[x][y+1]);
-    			repaint();
     			return;
     		}
     		
@@ -283,19 +266,16 @@ public class BoulderDash extends JPanel {
     			gamefield[x][y] = BDTile.EMPTY;
     			gamefield[x][y+1] = BDTile.ROCK;
     			rockStatus[x][y+1] = 1;
-    			repaint();
     			return;
     		} else if (isE(gamefield[x+1][y+1])) {
     			gamefield[x][y] = BDTile.EMPTY;
     			gamefield[x+1][y+1] = BDTile.ROCK; 
     			rockStatus[x+1][y+1] = 1;
-    			repaint();
     			return;
     		} else if (isE(gamefield[x-1][y+1])){
     			gamefield[x][y] = BDTile.EMPTY;
     			gamefield[x-1][y+1] = BDTile.ROCK;
     			rockStatus[x-1][y+1] = 1;
-    			repaint();
     			return;
     		}
     		
@@ -601,7 +581,8 @@ public class BoulderDash extends JPanel {
             for (int x = 0; x < WIDTH; x++) {
                 rockStatus[x][y] = 0;
                 diamondStatus[x][y] = 0;
-                fireFlyStatus[x][y] = 0;
+                fireFlyDirection[x][y] = 0;
+                fireFlyStatus[x][y] = 1;
             }
         }
     }
