@@ -152,9 +152,30 @@ public class BoulderDash extends JPanel {
 	            movePlayer(x, y, dx, dy);
 	            //bc the gamefield is 2d, we need a boolean to check so we can get out
 	            return true;
-	        } //end can move
+	        } else {
+	        	if (isStuck(x, y)) playerDied();
+	        }
 	    } //end if player
 	    return false;
+    }
+    
+    /**
+     * Loop through the entire board from the bottom to update it.
+     */
+    private synchronized void updateBoard () {
+    	for (int y = HEIGHT - 2; y >= 0; y--) {
+            for (int x = 1; x < WIDTH - 1; x++) {
+                if (gamefield[x][y] == BDTile.ROCK) updateRocks(x, y);
+                if (gamefield[x][y] == BDTile.DIAMOND) updateDiamonds(x, y);
+                if (gamefield[x][y] == BDTile.FIREFLY) updateFireFlies(x, y);
+                if (gamefield[x][y] == BDTile.BUTTERFLY) updateButterFlies(x, y);
+                if (gamefield[x][y] == BDTile.AMOEBA) {
+                	int prob = gen.nextInt(11);
+                	if (prob == 1) updateAmoeba(x,y);
+                }
+                repaint();
+            }
+        }
     }
     
     /**
@@ -228,22 +249,6 @@ public class BoulderDash extends JPanel {
     			}
     		}
     	}
-    }
-    
-    /**
-     * Loop through the entire board from the bottom to update it.
-     */
-    private synchronized void updateBoard () {
-    	for (int y = HEIGHT - 2; y >= 0; y--) {
-            for (int x = 1; x < WIDTH - 1; x++) {
-                if (gamefield[x][y] == BDTile.ROCK) updateRocks(x, y);
-                if (gamefield[x][y] == BDTile.DIAMOND) updateDiamonds(x, y);
-                if (gamefield[x][y] == BDTile.FIREFLY) updateFireFlies(x, y);
-                if (gamefield[x][y] == BDTile.BUTTERFLY) updateButterFlies(x, y);
-                if (gamefield[x][y] == BDTile.AMOEBA) updateAmoeba(x,y);
-                repaint();
-            }
-        }
     }
     
     /**
@@ -475,15 +480,26 @@ public class BoulderDash extends JPanel {
     /**
      * Update amoebas
      */
-    private void updateAmoeba(int x, int y) {
+    private void updateAmoeba (int x, int y) {    	
     	int dx;
     	int dy;
 		do {
     		dx = gen.nextInt(3) - 1;
     		dy = gen.nextInt(3) - 1;
-    	} while (dx == 0 && dy == 0);
+    	} while ((dx == 0 && dy == 0) || dx == 2 || dy == 2);
     	
-		if(isE(gamefield[x+dx][y+dy])) gamefield[x+dx][y+dy] = BDTile.AMOEBA;
+		if(isE(gamefield[x+dx][y+dy]) || isDirt(gamefield[x+dx][y+dy])) {
+			gamefield[x+dx][y+dy] = BDTile.AMOEBA;
+		}
+    }
+    
+    private boolean amoebaSurroundingFull(int x, int y) {
+    	for (int dx = -1; dx < 2; dx++) {
+    		for (int dy = -1; dy < 2; dy++) {
+    			if (isE(gamefield[dx][dy]) || isDirt(gamefield[dx][dy])) return false;
+    		}
+    	}
+    	return true;
     }
     
     /**
@@ -494,6 +510,17 @@ public class BoulderDash extends JPanel {
      */
     public boolean isMoveable (BDTile tile) {
         return ((tile.toString() == "EMPTY" || tile.toString() == "ROCK" || tile.toString() == "DIRT" || tile.toString() == "DIAMOND") || (tile.toString() == "EXIT" && winnable)) ? true : false;
+    }
+    
+    public boolean isStuck (int x, int y) {
+    	for (int dx = -1; dx < 2; dx++) {
+    		for (int dy = -1; dy < 2; dy++) {
+    			try {
+    				if (isE(gamefield[x + dx][y + dy]) || isDirt(gamefield[x + dx][y + dy]) || (isRock(gamefield[x + dx][y + dy]) && isRockMoveable(gamefield[x + dx][y + dy], gamefield[x + dx*2][y + dy*2]))) return false;
+    			} catch (ArrayIndexOutOfBoundsException e) {}
+    		}
+    	}
+    	return true;
     }
 
     /**
