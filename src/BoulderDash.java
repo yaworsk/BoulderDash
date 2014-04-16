@@ -4,7 +4,9 @@ import java.awt.FlowLayout;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Image;
+import java.awt.MediaTracker;
 import java.awt.Rectangle;
+import java.awt.Toolkit;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.KeyAdapter;
@@ -27,18 +29,23 @@ public class BoulderDash extends JPanel {
 	private final int WIDTH = 40;
     private final int HEIGHT = 22;
 	private BDTile[][] gamefield = new BDTile[WIDTH][HEIGHT];
+    private List<Rectangle> recs;
     
 	//gamefield Variables
-	private boolean playerAlive = true;
+	private volatile boolean playerAlive = true;
 	private BDLevelReader blr;
 	private int numLevels;
 	private int level = 1;
     private int moves = 0;
-    private int time = 0;
+    private int time;
+    
+    //direction variables
     private final int RIGHT = 2;
     private final int UP = 3;
     private final int LEFT = 0;
     private final int DOWN = 1;
+    
+    //enum related arrays
     private int[][] rockStatus = new int[WIDTH][HEIGHT];
     private int[][] diamondStatus = new int[WIDTH][HEIGHT];
     private int[][] fireFlyDirection = new int[WIDTH][HEIGHT];
@@ -46,6 +53,7 @@ public class BoulderDash extends JPanel {
     private int[][] butterFlyDirection = new int[WIDTH][HEIGHT];
     private int[][] butterFlyStatus = new int[WIDTH][HEIGHT];
     
+    //random generator
     private Random gen = new Random();
     
     //Timers
@@ -53,6 +61,7 @@ public class BoulderDash extends JPanel {
     private Timer levelActionsTimer;
     private static final int SECONDDELAY = 1000;
     private static final int LEVELACTIONDELAY = 200;
+    private static final int TIMELIMIT = 300;
 	
 	//level variables
 	private int diamondsCollected = 0;
@@ -64,7 +73,80 @@ public class BoulderDash extends JPanel {
     private JLabel levelTimerLabel = new JLabel("Time: " + time);
     private JLabel levelPlayerStatus = new JLabel("");
     private boolean winnable = false;
+    private volatile boolean exit = false;
+    //private Thread t = new Thread(new AmoebaThread());
+   
+    //images
+    private Image imgEmpty;
+    private Image imgPlayer;
+    private Image imgWall;
+    private Image imgRock;
+    private Image imgAmoeba;
+    private Image imgDiamond;
+    private Image imgFireFly;
+    private Image imgDirt;
+    private Image imgButterFly;
+    private Image imgExit; 
+    private Image imgRIP; 
     
+    /**
+     * Method to add rectangles to the List of Rectangles
+     *  
+     * @param x top left corner of rectangle
+     * @param y top left corner of rectangle
+     * @param width width of rectangle
+     * @param height height of rectangle
+     */
+    public void addSquare(int x, int y, int width, int height)  {
+        Rectangle rect = new Rectangle(x, y, width, height);
+        recs.add(rect);
+    }
+    
+/*    
+ * Tried... still not working.
+ */
+    /*private class AmoebaThread implements Runnable {
+    	boolean stuck = false;
+    	public void run() {
+    		System.out.println(exit);
+    		while (!exit) {
+    			System.out.println("RUNNING");
+				for (int y = HEIGHT - 2; y >= 0; y--) {
+			        for (int x = 1; x < WIDTH - 2; x++) {
+			        	System.out.println("Checking...");
+			        	stuck = amoebaStuck(x, y);
+			        	if (!stuck) break;
+			        }
+			        if (stuck) break;
+			    }
+				if (stuck) {
+					System.out.println("STUCK");
+					playerDied(); 
+					return;
+				}
+				System.out.println("Another round");
+			}
+    		System.out.println("DONE CHECK");
+    	}
+    }*/
+    
+    /**
+     * Tried... still not working.
+     */
+/*    private boolean amoebaStuck(int x, int y) {
+    	if (x != 0 && y!=0) {
+	    	for (int dx = -1; dx < 2; dx++) {
+	    		for (int dy = -1; dy < 2; dy++) {
+	    			int comx = x+dx;
+	    			int comy = y+dy;
+	    			System.out.println(comx + " " + comy);
+	    			if (isE(gamefield[x + dx][y + dy]) || isDirt(gamefield[x + dx][y + dy])) return false;
+	    		}
+	    	}
+	    }
+    	return true;
+    }*/
+
     /**
      * ActionListener for levelTimer counter
      */
@@ -153,12 +235,12 @@ public class BoulderDash extends JPanel {
 	            //bc the gamefield is 2d, we need a boolean to check so we can get out
 	            return true;
 	        } else {
-	        	if (isStuck(x, y)) playerDied();
+	        	if (playerStuck(x, y)) playerDied();
 	        }
 	    } //end if player
 	    return false;
     }
-    
+        
     /**
      * Loop through the entire board from the bottom to update it.
      */
@@ -170,7 +252,7 @@ public class BoulderDash extends JPanel {
                 if (gamefield[x][y] == BDTile.FIREFLY) updateFireFlies(x, y);
                 if (gamefield[x][y] == BDTile.BUTTERFLY) updateButterFlies(x, y);
                 if (gamefield[x][y] == BDTile.AMOEBA) {
-                	int prob = gen.nextInt(11);
+                	int prob = gen.nextInt(10);
                 	if (prob == 1) updateAmoeba(x,y);
                 }
                 repaint();
@@ -234,6 +316,14 @@ public class BoulderDash extends JPanel {
     	playerAlive = false;
     	stopLevelTimer();
     	levelPlayerStatus.setText("You Died.");
+    	repaint();
+    }
+    
+    public void timesUp() {
+    	playerAlive = false;
+    	stopLevelTimer();
+    	levelTimerLabel.setText("TIMES UP!!");
+    	repaint();
     }
       
     /**
@@ -244,8 +334,8 @@ public class BoulderDash extends JPanel {
     		for (int h = -1; h < 2; h++) {
     			if (!isWall(gamefield[x+i][y+h])) {
     				if (isPlayer(gamefield[x+i][y+h])) playerDied();
-    				if (isFireFly(tile)) gamefield[x+i][y+h] = BDTile.EMPTY;
-    				if (isButterFly(tile)) gamefield[x+i][y+h] = BDTile.DIAMOND;
+    				if (isFireFly(tile) && !isPlayer(gamefield[x+i][y+h])) gamefield[x+i][y+h] = BDTile.EMPTY;
+    				if (isButterFly(tile) && !isPlayer(gamefield[x+i][y+h])) gamefield[x+i][y+h] = BDTile.DIAMOND;
     			}
     		}
     	}
@@ -394,8 +484,6 @@ public class BoulderDash extends JPanel {
 			//check for the player
 			if (isPlayer(gamefield[x][y+1])) {
 				gamefield[x][y] = BDTile.EMPTY;
-				//TODO: CHANGE TO A DIFFERENT TYPE
-				gamefield[x][y+1] = BDTile.ROCK;
 				playerDied();
 				return;
 			}
@@ -493,15 +581,6 @@ public class BoulderDash extends JPanel {
 		}
     }
     
-    private boolean amoebaSurroundingFull(int x, int y) {
-    	for (int dx = -1; dx < 2; dx++) {
-    		for (int dy = -1; dy < 2; dy++) {
-    			if (isE(gamefield[dx][dy]) || isDirt(gamefield[dx][dy])) return false;
-    		}
-    	}
-    	return true;
-    }
-    
     /**
      * Check to see if the player can move to a tile
      * 
@@ -512,13 +591,16 @@ public class BoulderDash extends JPanel {
         return ((tile.toString() == "EMPTY" || tile.toString() == "ROCK" || tile.toString() == "DIRT" || tile.toString() == "DIAMOND") || (tile.toString() == "EXIT" && winnable)) ? true : false;
     }
     
-    public boolean isStuck (int x, int y) {
+    public boolean playerStuck (int x, int y) {
     	for (int dx = -1; dx < 2; dx++) {
     		for (int dy = -1; dy < 2; dy++) {
     			try {
+    				if ((dx == -1 && dy == -1) || (dx == 1 && dy == 1) || (dx == -1 && dy == 1) || (dx == 1 && dy == -1)) continue;
     				if (isE(gamefield[x + dx][y + dy]) || isDirt(gamefield[x + dx][y + dy]) || (isRock(gamefield[x + dx][y + dy]) && isRockMoveable(gamefield[x + dx][y + dy], gamefield[x + dx*2][y + dy*2]))) return false;
-    			} catch (ArrayIndexOutOfBoundsException e) {}
-    		}
+    			} catch (ArrayIndexOutOfBoundsException e) {
+    				//need to catch this since we'll be checking past walls
+    			}
+       		}
     	}
     	return true;
     }
@@ -624,6 +706,9 @@ public class BoulderDash extends JPanel {
     	return (tile.toString() == "PLAYER") ? true : false;
     }
     
+    /**
+     * Check whether a tile is an exit tile
+     */
     private boolean isExit(BDTile tile) {
     	return (tile.toString() == "EXIT") ? true : false;
 	}
@@ -634,6 +719,55 @@ public class BoulderDash extends JPanel {
     private void incMoves() {
         moves += 1;
         setMovesLabel();
+    }
+    
+    /**
+     * Go to the next level
+     */
+    private void nextLevel () {
+        level = (level == numLevels ? 1 : level + 1);
+    }
+    
+    /**
+     * Go to the previous level
+     */
+    private void prevLevel() {
+        level = (level == 1 ? numLevels : level - 1);
+    }
+    
+    /**
+     * Reset the current level
+     */
+    private void resetLevel() {
+    	requestExit();
+	    setLevelLabel();
+	    resetMoves();
+	    resetLevelTimerTime();
+	    resetLevelActionsTimer();
+	    resetDiamondsCollected();
+	    resetDiamondsCollectedLabel();
+	    resetDiamondsNeeded();
+	    resetLevelDiamondsNeededLabel();
+	    initObjects();
+	    playerAlive = true;
+	    levelPlayerStatus.setText("");
+	    winnable = false;
+	    time = TIMELIMIT;
+	    exit = false;
+    }
+    
+    /**
+     * Set the exit flag for the ameoba thread
+     */
+    public void requestExit(){
+    	exit = true;
+    }
+    
+    /**
+     * Set the Level Label
+     */
+    private void setLevelLabel() {
+        levelLabel.setText("Level: " + (level));
     }
     
     /**
@@ -652,27 +786,6 @@ public class BoulderDash extends JPanel {
     }
     
     /**
-     * Go to the next level
-     */
-    private void nextLevel () {
-        level = (level == numLevels ? 1 : level + 1);
-    }
-    
-    /**
-     * Go to the previous level
-     */
-    private void prevLevel() {
-        level = (level == 1 ? numLevels : level - 1);
-    }
-    
-    /**
-     * Set the Level Label
-     */
-    private void setLevelLabel() {
-        levelLabel.setText("Level: " + (level));
-    }
-    
-    /**
      * Reset the timer time
      */
     private void resetLevelTimerTime() {
@@ -680,18 +793,30 @@ public class BoulderDash extends JPanel {
         levelTimer.restart();
     }
     
+    /**
+     * Reset the number of diamonds needed
+     */
     private void resetDiamondsNeeded() {
     	diamondsNeeded = blr.getDiamondsNeeded();
     }
     
+    /**
+     * Reset the number of diamonds collected
+     */
     private void resetDiamondsCollected() {
     	diamondsCollected = 0;
     }	
     
+    /**
+     * Reset the diamonds needed label
+     */
 	private void resetLevelDiamondsNeededLabel() {
 		levelDiamondsNeeded.setText("Diamonds Needed: " + diamondsNeeded);
 	}
 	
+	/**
+	 * Reset the diamonds collected label
+	 */
 	private void resetDiamondsCollectedLabel() {
 		levelDiamondsCollected.setText("Diamonds Collected: " + (diamondsCollected));
 	}
@@ -700,14 +825,19 @@ public class BoulderDash extends JPanel {
      * Set the level time
      */
     private void setLevelTimerTime() {
-        time += 1;
+        time--;
+        if (time <= 0 ) {
+        	timesUp();
+        }
     }
     
     /**
      * Set the level Timer Label
      */
     private void setLevelTimerLabel() {
-        levelTimerLabel.setText("Time: " + time);
+        if (time > 0) {
+        	levelTimerLabel.setText("Time: " + time);
+        }
     }
     
     /**
@@ -741,6 +871,10 @@ public class BoulderDash extends JPanel {
         }
     }
     
+    /**
+     * Constructor
+     * @param file Bouderdash levels file
+     */
 	public BoulderDash(String file) {	
 		//set the screen
         setFocusable(true);
@@ -754,6 +888,28 @@ public class BoulderDash extends JPanel {
 		} catch (Exception e) {
 			System.out.println("Could not load levels.");
 		}
+		
+		//initialize all the images
+        imgEmpty = Toolkit.getDefaultToolkit().getImage("img/empty.png");
+        imgPlayer = Toolkit.getDefaultToolkit().getImage("img/player.png");
+        imgWall = Toolkit.getDefaultToolkit().getImage("img/wall.png");
+        imgRock = Toolkit.getDefaultToolkit().getImage("img/boulder.png");
+        imgAmoeba = Toolkit.getDefaultToolkit().getImage("img/amoeba.png");
+        imgDiamond = Toolkit.getDefaultToolkit().getImage("img/diamond.png");
+        imgFireFly = Toolkit.getDefaultToolkit().getImage("img/firefly.png");
+        imgExit = Toolkit.getDefaultToolkit().getImage("img/door.png");
+        imgButterFly = Toolkit.getDefaultToolkit().getImage("img/butterfly.png");
+        imgDirt = Toolkit.getDefaultToolkit().getImage("img/dirt.png");
+        imgRIP = Toolkit.getDefaultToolkit().getImage("img/RIP.png");
+        
+        //add the images to the mediatracker
+        MediaTracker m = new MediaTracker(this);
+        m.addImage(imgEmpty, 0);
+        m.addImage(imgPlayer, 0);
+        m.addImage(imgWall, 0);
+        m.addImage(imgAmoeba, 0);
+        m.addImage(imgFireFly, 0);
+        m.addImage(imgDiamond, 0);
 		
         //add key listeners
         this.addKeyListener(new ControlsKeyListener());
@@ -788,28 +944,19 @@ public class BoulderDash extends JPanel {
 			System.out.println("Could not set level.");
 		}
     	
+        recs = new ArrayList<Rectangle>();
 		//build the gamefield array with the corresponding tile
         for (int x = 0; x < WIDTH; x++) {
             for (int y = 0; y < HEIGHT; y++) {
                 this.gamefield[x][y] = blr.getTile(x, y);
+                addSquare(x * 30, y * 30, 30, 30);
             }
         }
         
         this.isReady = true;
-        setLevelLabel();
-        resetMoves();
-        resetLevelTimerTime();
-        resetLevelActionsTimer();
-        resetDiamondsCollected();
-        resetDiamondsCollectedLabel();
-        resetDiamondsNeeded();
-        resetLevelDiamondsNeededLabel();
-        initObjects();
-        playerAlive = true;
-        levelPlayerStatus.setText("");
-        winnable = false;
-        
-        //writeLastLevel();
+        resetLevel();
+        //t.start();
+
         repaint();
     }
 
@@ -817,24 +964,23 @@ public class BoulderDash extends JPanel {
 		if(!isReady) return;
 		super.paintComponent(g);  
         Graphics2D g2 = (Graphics2D) g;
+        int xVal;
+        int yVal;
         for (int x = 0; x <= gamefield.length - 1; x++) {
             for (int y = 0; y <= gamefield[x].length - 1; y++) {
-            	//System.out.println(x + ", " + y + ": " + gamefield[x][y].toString());
-            	Rectangle2D.Double r = new Rectangle2D.Double((x+2)*30, (y+2)*30, 30, 30);
-            	g2.draw(r);
-                if (gamefield[x][y].toString() == "EMPTY") g2.setPaint(Color.BLACK);
-                if (gamefield[x][y].toString() == "DIRT")  g2.setPaint(Color.GREEN);
-                if (gamefield[x][y].toString() == "WALL")  g2.setPaint(Color.DARK_GRAY);
-                if (gamefield[x][y].toString() == "ROCK")  g2.setPaint(Color.LIGHT_GRAY);
-                if (gamefield[x][y].toString() == "FALLINGROCK")  g2.setPaint(Color.WHITE);
-                if (gamefield[x][y].toString() == "DIAMOND")  g2.setPaint(Color.MAGENTA);
-                if (gamefield[x][y].toString() == "FALLINGDIAMOND")  g2.setPaint(Color.YELLOW);
-                if (gamefield[x][y].toString() == "AMOEBA")  g2.setPaint(Color.PINK);
-                if (gamefield[x][y].toString() == "FIREFLY") g2.setPaint(Color.ORANGE);
-                if (gamefield[x][y].toString() == "BUTTERFLY") g2.setPaint(Color.CYAN);
-                if (gamefield[x][y].toString() == "EXIT")  g2.setPaint(Color.BLUE);
-                if (gamefield[x][y].toString() == "PLAYER") g2.setPaint(Color.RED);
-                g2.fill(r);
+                xVal = (int)recs.get((gamefield[x].length)*x+y).getX() + 60;
+                yVal = (int)recs.get((gamefield[x].length)*x+y).getY() + 60;
+                if (gamefield[x][y].toString() == "WALL") g2.drawImage(imgWall, xVal, yVal, this);
+                if (gamefield[x][y].toString() == "EMPTY") g2.drawImage(imgEmpty, xVal, yVal, this);
+                if (gamefield[x][y].toString() == "PLAYER" && playerAlive) g2.drawImage(imgPlayer, xVal, yVal, this);
+                if (gamefield[x][y].toString() == "PLAYER" && !playerAlive) g2.drawImage(imgRIP, xVal, yVal, this);
+                if (gamefield[x][y].toString() == "ROCK")  g2.drawImage(imgRock, xVal, yVal, this);
+                if (gamefield[x][y].toString() == "AMOEBA")  g2.drawImage(imgAmoeba, xVal, yVal, this);
+                if (gamefield[x][y].toString() == "DIAMOND")  g2.drawImage(imgDiamond, xVal, yVal, this);
+                if (gamefield[x][y].toString() == "DIRT")  g2.drawImage(imgDirt, xVal, yVal, this);
+                if (gamefield[x][y].toString() == "BUTTERFLY") g2.drawImage(imgButterFly, xVal, yVal, this);
+                if (gamefield[x][y].toString() == "EXIT")  g2.drawImage(imgExit, xVal, yVal, this);
+                if (gamefield[x][y].toString() == "FIREFLY") g2.drawImage(imgFireFly, xVal, yVal, this);
             }    
         }
 	}
@@ -845,7 +991,7 @@ public class BoulderDash extends JPanel {
      */
     public static void main(String args[]) {
         JFrame f = new JFrame("Boulder Dash");
-        f.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+        f.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         f.setLayout(new FlowLayout());
         f.add(new BoulderDash("levels.xml"));
         f.pack();
