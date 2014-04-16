@@ -37,16 +37,22 @@ public class BoulderDash extends JPanel {
 	private int level = 1;
     private int moves = 0;
     private int time = 0;
+    private final int RIGHT = 2;
+    private final int UP = 3;
+    private final int LEFT = 0;
+    private final int DOWN = 1;
     private int[][] rockStatus = new int[WIDTH][HEIGHT];
     private int[][] diamondStatus = new int[WIDTH][HEIGHT];
     private int[][] fireFlyDirection = new int[WIDTH][HEIGHT];
     private int[][] fireFlyStatus = new int[WIDTH][HEIGHT];
+    private int[][] butterFlyDirection = new int[WIDTH][HEIGHT];
+    private int[][] butterFlyStatus = new int[WIDTH][HEIGHT];
     
     //Timers
     private Timer levelTimer;
     private Timer levelActionsTimer;
     private static final int SECONDDELAY = 1000;
-    private static final int LEVELACTIONDELAY = 200;
+    private static final int LEVELACTIONDELAY = 1000;
 	
 	//level variables
 	private int diamondsCollected = 0;
@@ -166,7 +172,8 @@ public class BoulderDash extends JPanel {
             for (int x = 1; x < WIDTH - 1; x++) {
                 if (gamefield[x][y] == BDTile.ROCK) updateRocks(x, y);
                 if (gamefield[x][y] == BDTile.DIAMOND) updateDiamonds(x, y);
-                if (gamefield[x][y] == BDTile.FIREFLY) updateFireFlys(x, y);
+                if (gamefield[x][y] == BDTile.FIREFLY) updateFireFlies(x, y);
+                if (gamefield[x][y] == BDTile.BUTTERFLY) updateButterFlies(x, y);
                 repaint();
             }
         }
@@ -175,7 +182,7 @@ public class BoulderDash extends JPanel {
     /**
      * Update fireflys
      */
-    private void updateFireFlys(int x, int y) {
+    private void updateFireFlies(int x, int y) {
     	if (
     		gamefield[x+1][y] == BDTile.PLAYER || 
     		gamefield[x][y+1] == BDTile.PLAYER ||
@@ -187,49 +194,121 @@ public class BoulderDash extends JPanel {
     	}
     	
     	if (fireFlyStatus[x][y] == 1) {
-	    	if (fireFlyDirection[x][y] == 0) {
+	    	if (fireFlyDirection[x][y] == RIGHT) {
 	    		if (isE(gamefield[x+1][y])) {
 	    			gamefield[x][y] = BDTile.EMPTY;
 	    			gamefield[x+1][y] = BDTile.FIREFLY;
-	    			fireFlyDirection[x+1][y] = 0;
+	    			fireFlyDirection[x+1][y] = RIGHT;
 	    			fireFlyStatus[x+1][y] = 0;
 	    		} else {
-	    			fireFlyDirection[x][y] = 1;
+	    			fireFlyDirection[x][y] = DOWN;
 	    		}
-	    	}
+	    		return;
+	    	}	
 	    	
-	    	if (fireFlyDirection[x][y] == 1) {
-	    		if (isE(gamefield[x][y+1])) {
-	    			gamefield[x][y] = BDTile.EMPTY;
-	    			gamefield[x][y+1] = BDTile.FIREFLY;
-	    			fireFlyDirection[x][y+1] = 1;
-	    		} else {
-	    			fireFlyDirection[x][y] = 2;
-	    		}
-	    	}
-	    	
-	    	if (fireFlyDirection[x][y] == 2) {
-	    		if (isE(gamefield[x-1][y])) {
-	    			gamefield[x][y] = BDTile.EMPTY;
-	    			gamefield[x-1][y] = BDTile.FIREFLY;
-	    			fireFlyDirection[x-1][y] = 2;
-	    		} else {
-	    			fireFlyDirection[x][y] = 3;
-	    		}
-	    	}
-	    	
-	    	if (fireFlyDirection[x][y] == 3) {
+	    	if (fireFlyDirection[x][y] == UP) {
 	    		if (isE(gamefield[x][y-1])) {
 	    			gamefield[x][y] = BDTile.EMPTY;
 	    			gamefield[x][y-1] = BDTile.FIREFLY;
-	    			fireFlyDirection[x][y-1] = 3;
+	    			fireFlyDirection[x][y-1] = UP;
 	    			fireFlyStatus[x][y-1] = 0;
 	    		} else {
-	    			fireFlyDirection[x][y] = 0;
+	    			fireFlyDirection[x][y] = RIGHT;
 	    		}
+	    		return;
 	    	}
+	    	
+	    	if (fireFlyDirection[x][y] == LEFT) {
+	    		if (isE(gamefield[x-1][y])) {
+	    			gamefield[x][y] = BDTile.EMPTY;
+	    			gamefield[x-1][y] = BDTile.FIREFLY;
+	    			fireFlyDirection[x-1][y] = LEFT;
+	    		} else {
+	    			fireFlyDirection[x][y] = UP;
+	    		}
+	    		return;
+	    	}
+	    	
+	    	if (fireFlyDirection[x][y] == DOWN) {
+	    		if (isE(gamefield[x][y+1])) {
+	    			gamefield[x][y] = BDTile.EMPTY;
+	    			gamefield[x][y+1] = BDTile.FIREFLY;
+	    			fireFlyDirection[x][y+1] = DOWN;
+	    		} else {
+	    			fireFlyDirection[x][y] = LEFT;
+	    		}
+	    		return;
+	    	}
+	    	
+
     	} else {
     		fireFlyStatus[x][y] = 1;
+    	}
+    }
+    
+    /**
+     * Update butterflies
+     */
+    private void updateButterFlies(int x, int y) {
+    	if (
+    		gamefield[x+1][y] == BDTile.PLAYER || 
+    		gamefield[x][y+1] == BDTile.PLAYER ||
+    		gamefield[x-1][y] == BDTile.PLAYER ||
+    		gamefield[x][y-1] == BDTile.PLAYER 
+    		) {
+    		explode(x, y, gamefield[x][y]);
+    		return;
+    	}
+    	
+    	if (butterFlyStatus[x][y] == 1) {
+    		if (butterFlyDirection[x][y] == RIGHT) {
+	    		if (isE(gamefield[x+1][y])) {
+	    			gamefield[x][y] = BDTile.EMPTY;
+	    			gamefield[x+1][y] = BDTile.BUTTERFLY;
+	    			butterFlyDirection[x+1][y] = RIGHT;
+	    			butterFlyStatus[x+1][y] = 0;
+	    		} else {
+	    			butterFlyDirection[x][y] = UP;
+	    		}
+	    		return;
+	    	}
+	    	
+	    	if (butterFlyDirection[x][y] == UP) {
+	    		if (isE(gamefield[x][y-1])) {
+	    			gamefield[x][y] = BDTile.EMPTY;
+	    			gamefield[x][y-1] = BDTile.BUTTERFLY;
+	    			butterFlyDirection[x][y-1] = UP;
+	    			butterFlyStatus[x][y-1] = 0;
+	    		} else {
+	    			butterFlyDirection[x][y] = LEFT;
+	    		}
+	    		return;
+	    	}
+	    	
+	    	if (butterFlyDirection[x][y] == LEFT) {
+	    		if (isE(gamefield[x-1][y])) {
+	    			gamefield[x][y] = BDTile.EMPTY;
+	    			gamefield[x-1][y] = BDTile.BUTTERFLY;
+	    			butterFlyDirection[x-1][y] = LEFT;
+	    		} else {
+	    			butterFlyDirection[x][y] = DOWN;
+	    		}
+	    		return;
+	    	}
+	    	
+	    	if (butterFlyDirection[x][y] == DOWN) {
+	    		if (isE(gamefield[x][y+1])) {
+	    			gamefield[x][y] = BDTile.EMPTY;
+	    			gamefield[x][y+1] = BDTile.BUTTERFLY;
+	    			butterFlyDirection[x][y+1] = DOWN;
+	    		} else {
+	    			butterFlyDirection[x][y] = RIGHT;
+	    		}
+	    		return;
+	    	}
+
+    	} else {
+    		butterFlyStatus[x][y] = 1;
     	}
     }
     
@@ -583,6 +662,8 @@ public class BoulderDash extends JPanel {
                 diamondStatus[x][y] = 0;
                 fireFlyDirection[x][y] = 0;
                 fireFlyStatus[x][y] = 1;
+                butterFlyDirection[x][y] = 0;
+                butterFlyStatus[x][y] = 1;
             }
         }
     }
