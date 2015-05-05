@@ -4,5 +4,4 @@
 .project
 .settings
 .settings/*
-bin/
-bin/*
+bin/*.class
